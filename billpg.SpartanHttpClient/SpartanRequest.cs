@@ -78,8 +78,6 @@ public sealed record SpartanRequest
         return ip;
     }
         
-    private static bool DefaultIsIpAddressAcceptable(IPAddress address) => true;
-
     private static bool DefaultIsCertificateAcceptable(
         Uri url, X509Certificate2 certificate, X509Chain? chain, SslPolicyErrors sslPolicyErrors)
         => sslPolicyErrors == SslPolicyErrors.None;

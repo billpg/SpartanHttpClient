@@ -11,8 +11,9 @@ with tight control over DNS resolution, which resolved IP addresses are trusted,
 how the TLS certificate is validated - the kind of control a server-side "call this
 webhook URL the caller gave us" flow needs to defend against SSRF, without dragging in
 `HttpClientFactory`, `SocketsHttpHandler` configuration, or a DI container. This library
-speaks HTTP/1.1 directly over `TcpClient`/`SslStream` and exposes those three points -
-IP lookup, IP acceptance, and certificate validation - as plain delegates.
+speaks HTTP/1.1 directly over `TcpClient`/`SslStream` and exposes those points - IP
+lookup (with acceptance filtering folded in) and certificate validation - as plain
+delegates.
 
 ## 📦 Usage
 
@@ -30,28 +31,34 @@ Console.WriteLine(response.Body);
 `SpartanRequest` is immutable - each `With...` call returns a new instance - so a
 request can be built up incrementally and reused as a template for several fetches.
 
-### Configuring DNS resolution
+### Configuring DNS resolution and IP acceptance
 
 ```csharp
 var response = await new SpartanRequest(url)
-    .WithIpLookupHandler((host, ct) => Dns.GetHostAddressesAsync(host))
+    .WithIpLookupHandler(async (host, ct) => (await Dns.GetHostAddressesAsync(host, ct))[0])
     .Run();
 ```
 
-Defaults to the standard DNS resolver.
-
-### Restricting which IP addresses are acceptable
+`WithIpLookupHandler` takes a delegate that resolves a host to a single address to
+connect to - return one, or throw if none are usable. There's no separate acceptance
+hook: filtering is the lookup delegate's own job. A handler that needs to weigh several
+candidate addresses walks them itself and returns the first it accepts:
 
 ```csharp
 var response = await new SpartanRequest(url)
-    .WithIpAddressHandler(ip => !IPAddress.IsLoopback(ip) && !ip.IsPrivate())
+    .WithIpLookupHandler(async (host, ct) =>
+    {
+        foreach (var candidate in await Dns.GetHostAddressesAsync(host))
+            if (!IPAddress.IsLoopback(candidate) && !candidate.IsPrivate())
+                return candidate;
+        throw new SpartanHttpException("URL not acceptable.", $"No acceptable IP address for {host}.");
+    })
     .Run();
 ```
 
-Given a lookup that returns several candidate addresses, each is offered to this
-handler in turn until one is accepted. Defaults to accepting any address - callers that
+Defaults to the standard DNS resolver's first answer, with no filtering - callers that
 need SSRF-style protection (rejecting loopback, link-local, or other private ranges)
-supply their own handler.
+supply their own handler that does both the resolving and the filtering.
 
 ### Configuring TLS certificate validation
 
