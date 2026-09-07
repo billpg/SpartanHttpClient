@@ -1,0 +1,29 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>billpg.SpartanHttpClient</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>William Godfrey</Authors>
+    <Company>billpg industries</Company>
+    <Copyright>Copyright (c) 2026 William Godfrey</Copyright>
+    <Description>A minimal, one-shot HTTP GET client with a fluent, immutable request builder. Speaks HTTP/1.1 directly over TcpClient/SslStream rather than wrapping HttpClient, with configurable hooks for DNS resolution, IP address acceptance, and TLS certificate validation.</Description>
+    <PackageTags>http;httpclient;https;tls</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/billpg/SpartanHttpClient.DotNet</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/billpg/SpartanHttpClient.DotNet</PackageProjectUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>
