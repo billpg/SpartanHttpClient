@@ -14,7 +14,7 @@ public class SpartanHttpFetcherTests
     /// dnsLookup delegate provided in the original HashBack HttpGetter.</summary>
     private static SpartanRequest RequestForPort(int port, string scheme = "http")
         => new SpartanRequest($"{scheme}://rutabaga.invalid:{port}/")
-            .WithIpLookupHandler((host, ct) => Task.FromResult(new[] { IPAddress.Loopback }));
+            .WithIpLookupHandler((host, ct) => Task.FromResult(IPAddress.Loopback));
 
     [TestMethod]
     public async Task Run_ReturnsStatusCodeHeadersAndBody()
@@ -65,19 +65,6 @@ public class SpartanHttpFetcherTests
 
         StringAssert.Contains(ex.Message, "Timed out");
         Assert.IsLessThan(2000, stopwatch.ElapsedMilliseconds, "Timeout should fire close to the configured 200ms, not fall back to a much larger default.");
-    }
-
-    [TestMethod]
-    public async Task IsIpAddressAcceptable_RejectingEveryCandidate_Throws()
-    {
-        using var server = new LoopbackServer();
-        server.RespondWith("HTTP/1.1 200 OK\r\n\r\n");
-
-        var request = RequestForPort(server.Port)
-            .WithIpAddressHandler(ip => false);
-
-        var ex = await Assert.ThrowsExactlyAsync<SpartanHttpException>(() => request.Run());
-        StringAssert.Contains(ex.Message, "acceptable");
     }
 
     [TestMethod]

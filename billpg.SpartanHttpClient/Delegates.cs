@@ -12,16 +12,7 @@ namespace billpg.SpartanHttpClient;
 /// <see cref="SpartanRequest"/> unless overridden via WithIpLookupHandler, wraps the
 /// standard DNS resolver.
 /// </summary>
-public delegate Task<IPAddress[]> IpLookupDelegate(string host, CancellationToken cancellationToken);
-
-/// <summary>
-/// Decides whether a candidate IP address, returned by the configured
-/// <see cref="IpLookupDelegate"/>, is acceptable to connect to. Where a lookup returns
-/// several candidates, each is offered to this delegate in turn until one is accepted.
-/// The default accepts every address unconditionally; supply a handler via
-/// WithIpAddressHandler to add restrictions such as rejecting private/loopback ranges.
-/// </summary>
-public delegate bool IsIpAddressAcceptableDelegate(IPAddress address);
+public delegate Task<IPAddress> IpLookupDelegate(string host, CancellationToken cancellationToken);
 
 /// <summary>
 /// Decides whether a remote TLS certificate is acceptable, given the certificate, its

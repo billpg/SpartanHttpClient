@@ -26,7 +26,6 @@ public sealed record SpartanRequest
     public TimeSpan Timeout { get; private init; } = TimeSpan.FromSeconds(10);
     public long? MaxResponseBytes { get; private init; }
     public IpLookupDelegate IpLookup { get; private init; } = DefaultIpLookup;
-    public IsIpAddressAcceptableDelegate IsIpAddressAcceptable { get; private init; } = DefaultIsIpAddressAcceptable;
     public IsCertificateAcceptableDelegate IsCertificateAcceptable { get; private init; } = DefaultIsCertificateAcceptable;
 
     public SpartanRequest(Uri url)
@@ -61,12 +60,6 @@ public sealed record SpartanRequest
     public SpartanRequest WithIpLookupHandler(IpLookupDelegate handler)
         => this with { IpLookup = handler };
 
-    /// <summary>Replaces the check applied to each candidate IP address before
-    /// connecting to it. Defaults to accepting any address; supply a handler to add
-    /// restrictions, such as rejecting private or loopback ranges.</summary>
-    public SpartanRequest WithIpAddressHandler(IsIpAddressAcceptableDelegate handler)
-        => this with { IsIpAddressAcceptable = handler };
-
     /// <summary>Replaces the TLS certificate check. Defaults to ordinary CA-based
     /// validation - exactly what SslStream would accept with no custom callback.</summary>
     public SpartanRequest WithCertificateValidator(IsCertificateAcceptableDelegate validator)
@@ -76,9 +69,15 @@ public sealed record SpartanRequest
     public Task<SpartanResponse> Run(CancellationToken cancellationToken = default)
         => SpartanHttpFetcher.RunAsync(this, cancellationToken);
 
-    private static Task<IPAddress[]> DefaultIpLookup(string host, CancellationToken cancellationToken)
-        => Dns.GetHostAddressesAsync(host).WithCancellation(cancellationToken);
-
+    private static async Task<IPAddress> DefaultIpLookup(string host, CancellationToken cancellationToken)
+    {
+        var ip = (await Dns.GetHostAddressesAsync(host).WithCancellation(cancellationToken)).FirstOrDefault() 
+            ?? throw new SpartanHttpException(
+                "External URL not available.",
+                $"No IP address found for host ({host}).");
+        return ip;
+    }
+        
     private static bool DefaultIsIpAddressAcceptable(IPAddress address) => true;
 
     private static bool DefaultIsCertificateAcceptable(

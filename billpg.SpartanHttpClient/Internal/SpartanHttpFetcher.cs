@@ -163,18 +163,8 @@ internal static class SpartanHttpFetcher
     }
 
     private static async Task<IPAddress> ResolveAcceptableAddressAsync(SpartanRequest request, CancellationToken cancellationToken)
-    {
-        var candidates = await request.IpLookup(request.Url.Host, cancellationToken).ConfigureAwait(false);
-        foreach (var ip in candidates)
-        {
-            if (request.IsIpAddressAcceptable(ip))
-                return ip;
-        }
-
-        throw new SpartanHttpException(
-            "External URL not available.",
-            $"None of the {candidates.Length} IP address(es) for host ({request.Url.Host}) are acceptable.");
-    }
+        => await request.IpLookup(request.Url.Host, cancellationToken).ConfigureAwait(false);
+    
 
     private static void ValidateUrlOrThrow(Uri url)
     {

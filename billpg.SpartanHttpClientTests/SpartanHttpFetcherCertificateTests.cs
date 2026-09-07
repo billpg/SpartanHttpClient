@@ -18,7 +18,7 @@ public class SpartanHttpFetcherCertificateTests
         server.AcceptAndRespond("HTTP/1.1 200 OK\r\n\r\n");
 
         var request = new SpartanRequest($"https://rutabaga.invalid:{server.Port}/")
-            .WithIpLookupHandler((host, ct) => Task.FromResult(new[] { IPAddress.Loopback }))
+            .WithIpLookupHandler((host, ct) => Task.FromResult(IPAddress.Loopback))
             .WithTimeout(TimeSpan.FromSeconds(5));
 
         var ex = await Assert.ThrowsExactlyAsync<SpartanHttpException>(() => request.Run());
@@ -34,7 +34,7 @@ public class SpartanHttpFetcherCertificateTests
         var expectedHash = Convert.ToBase64String(SHA256.HashData(server.Certificate.RawData));
 
         var request = new SpartanRequest($"https://rutabaga.invalid:{server.Port}/")
-            .WithIpLookupHandler((host, ct) => Task.FromResult(new[] { IPAddress.Loopback }))
+            .WithIpLookupHandler((host, ct) => Task.FromResult(IPAddress.Loopback))
             .WithCertificateValidator((url, cert, chain, errors) => true)
             .WithTimeout(TimeSpan.FromSeconds(5));
 
