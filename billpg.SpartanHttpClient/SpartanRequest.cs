@@ -40,7 +40,7 @@ public sealed record SpartanRequest
 
     /// <summary>Adds a header. Setting the same name twice combines the values with a
     /// comma, per RFC 9110 5.3, rather than replacing the earlier value.</summary>
-    public SpartanRequest WithHeader(string name, string value)
+    public SpartanRequest WithHeader(string name, string? value)
         => this with { Headers = HeaderMerge.Add(Headers, name, value) };
 
     /// <summary>Bounds the entire fetch - DNS resolution, TCP connect, TLS handshake,

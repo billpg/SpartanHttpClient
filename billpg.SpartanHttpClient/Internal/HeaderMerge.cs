@@ -14,8 +14,11 @@ internal static class HeaderMerge
     /// the wire (see ResponseLineParser for that case).
     /// </summary>
     internal static IReadOnlyDictionary<string, string> Add(
-        IReadOnlyDictionary<string, string> headers, string name, string value)
+        IReadOnlyDictionary<string, string> headers, string name, string? value)
     {
+        if (value is null)
+            return headers;
+
         var newHeaders = Copy(headers);
         var oldValue = newHeaders.TryGetValue(name, out var existing) ? existing : null;
         newHeaders[name] = oldValue == null ? value : oldValue + "," + value;
