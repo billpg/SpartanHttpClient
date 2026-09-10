@@ -24,3 +24,5 @@ public delegate Task<IPAddress> IpLookupDelegate(string host, CancellationToken 
 /// </summary>
 public delegate bool IsCertificateAcceptableDelegate(
     Uri url, X509Certificate2 certificate, X509Chain? chain, SslPolicyErrors sslPolicyErrors);
+
+public delegate Task<SpartanResponse> SpartanRequestRunner(SpartanRequest request, CancellationToken cancellationToken);

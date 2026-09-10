@@ -27,6 +27,7 @@ public sealed record SpartanRequest
     public long? MaxResponseBytes { get; private init; }
     public IpLookupDelegate IpLookup { get; private init; } = DefaultIpLookup;
     public IsCertificateAcceptableDelegate IsCertificateAcceptable { get; private init; } = DefaultIsCertificateAcceptable;
+    public SpartanRequestRunner Runner { get; private init; } = SpartanHttpFetcher.RunAsync;
 
     public SpartanRequest(Uri url)
     {
@@ -65,9 +66,12 @@ public sealed record SpartanRequest
     public SpartanRequest WithCertificateValidator(IsCertificateAcceptableDelegate validator)
         => this with { IsCertificateAcceptable = validator };
 
+    public SpartanRequest WithRunner(SpartanRequestRunner runner)
+        => this with { Runner = runner };
+
     /// <summary>Sends the request and returns the completed response.</summary>
     public Task<SpartanResponse> Run(CancellationToken cancellationToken = default)
-        => SpartanHttpFetcher.RunAsync(this, cancellationToken);
+        => this.Runner(this, cancellationToken);
 
     private static async Task<IPAddress> DefaultIpLookup(string host, CancellationToken cancellationToken)
     {
