@@ -5,15 +5,25 @@ builder.
 
 ## 🤔 Why This Exists
 
-`HttpClient` is a general-purpose tool built for connection pooling, keep-alive, and
-long-lived reuse. Sometimes what's actually needed is simpler: fetch one URL, once,
-with tight control over DNS resolution, which resolved IP addresses are trusted, and
-how the TLS certificate is validated - the kind of control a server-side "call this
-webhook URL the caller gave us" flow needs to defend against SSRF, without dragging in
-`HttpClientFactory`, `SocketsHttpHandler` configuration, or a DI container. This library
-speaks HTTP/1.1 directly over `TcpClient`/`SslStream` and exposes those points - IP
-lookup (with acceptance filtering folded in) and certificate validation - as plain
-delegates.
+The main reason: `HttpClient` won't let you trap the DNS lookup. Give it a URL and it
+resolves the hostname and connects itself, somewhere down inside
+`SocketsHttpHandler`/`SocketsHttpConnectionPool`, with no supported hook to see or
+control which IP address it actually ends up talking to. For ordinary client code
+that's irrelevant. For a server-side "call this webhook URL the caller gave us" flow,
+it's a real SSRF hole: you can validate the URL's hostname all you like beforehand, but
+by the time `HttpClient` resolves it for real, DNS could answer with a private,
+loopback, or link-local address instead, and there's nothing in `HttpClient`'s public
+surface that lets you reject that address before the connection is made. Working around
+this from outside means intercepting DNS at the OS/process level, or reimplementing the
+resolve step some other way and hoping `HttpClient` doesn't re-resolve underneath you -
+neither is a fix you can put in a library.
+
+`HttpClient` is also a general-purpose tool built for connection pooling, keep-alive,
+and long-lived reuse, when sometimes what's actually needed is simpler: fetch one URL,
+once. So this library speaks HTTP/1.1 directly over `TcpClient`/`SslStream` instead,
+and exposes DNS resolution (with acceptance filtering folded in) and TLS certificate
+validation as plain delegates - the exact control `HttpClient` doesn't offer - without
+dragging in `HttpClientFactory`, `SocketsHttpHandler` configuration, or a DI container.
 
 ## 📦 Usage
 
@@ -105,8 +115,43 @@ connection closing to know a response is complete isn't safe on its own.
 ### Errors
 
 A request that can't be completed - a malformed URL, a DNS or TCP connection failure, a
-rejected TLS certificate, or a timeout - throws `SpartanHttpException`, with a short
-`Title` plus a diagnostic `Message`.
+connection lost or reset mid-response, a rejected TLS certificate, or a timeout - throws
+`SpartanHttpException`, with a short `Title`, a diagnostic `Message`, and (other than for
+a malformed URL) the original exception as `InnerException`. Every failure mode from this
+library comes back as this one exception type, so a caller only has one type to catch.
+
+### Testing code that uses SpartanRequest
+
+`SpartanRequest.Run()` actually goes out over the network via `SpartanRequestRunner`
+(`Task<SpartanResponse> Run(SpartanRequest, CancellationToken)`), a property defaulting
+to the library's own fetcher. `WithRunner` replaces it, which is enough to substitute a
+fake for tests without any further abstraction from this library:
+
+```csharp
+public class WebhookNotifier
+{
+    private readonly Func<Uri, SpartanRequest> newRequest;
+
+    // Production code takes the default: newRequest: url => new SpartanRequest(url)
+    public WebhookNotifier(Func<Uri, SpartanRequest>? newRequest = null)
+        => this.newRequest = newRequest ?? (url => new SpartanRequest(url));
+
+    public Task<SpartanResponse> NotifyAsync(Uri webhookUrl)
+        => newRequest(webhookUrl).WithHeader("Content-Type", "application/json").Run();
+}
+```
+
+A test constructs the same class with a `Func<Uri, SpartanRequest>` that stubs out the
+runner instead of hitting the network:
+
+```csharp
+var notifier = new WebhookNotifier(
+    url => new SpartanRequest(url).WithRunner((request, ct) => Task.FromResult(
+        new SpartanResponse().WithStatusCode(200))));
+```
+
+`SpartanResponse` is immutable in the same style, with its own `With...` methods, so a
+test can build exactly the response it wants a fake runner to return.
 
 ## 🗂️ Project Layout
 

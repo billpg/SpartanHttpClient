@@ -56,4 +56,46 @@ public class SpartanRequestTests
         var request = new SpartanRequest("https://rutabaga.example/");
         Assert.IsNull(request.MaxResponseBytes);
     }
+
+    [TestMethod]
+    public void WithHeader_NullValue_SkipsHeader()
+    {
+        var request = new SpartanRequest("https://rutabaga.example/")
+            .WithHeader("X-Vegetable", null);
+
+        Assert.IsEmpty(request.Headers);
+    }
+
+    [TestMethod]
+    public void WithHeader_NullValue_LeavesEarlierValueForSameNameUntouched()
+    {
+        var request = new SpartanRequest("https://rutabaga.example/")
+            .WithHeader("X-Vegetable", "Rutabaga")
+            .WithHeader("X-Vegetable", null);
+
+        Assert.AreEqual("Rutabaga", request.Headers["X-Vegetable"]);
+    }
+
+    /// <summary>The documented way to make code under test substitute a fake instead of
+    /// hitting the network: no engine or interface from this library needed, since
+    /// SpartanRequest's own Runner property is already the seam.</summary>
+    [TestMethod]
+    public async Task WithRunner_ReplacesHowRunIsExecuted()
+    {
+        var fakeResponse = new SpartanResponse().WithStatusCode(200).WithBody("Rutabaga Farms Inc");
+        SpartanRequest? requestSeenByRunner = null;
+
+        var request = new SpartanRequest("https://rutabaga.example/")
+            .WithHeader("X-Vegetable", "Rutabaga")
+            .WithRunner((req, ct) =>
+            {
+                requestSeenByRunner = req;
+                return Task.FromResult(fakeResponse);
+            });
+
+        var response = await request.Run();
+
+        Assert.AreSame(fakeResponse, response);
+        Assert.AreSame(request, requestSeenByRunner);
+    }
 }

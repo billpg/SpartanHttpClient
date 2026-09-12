@@ -11,8 +11,8 @@ public class SpartanHttpException : Exception
 {
     public string Title { get; }
 
-    public SpartanHttpException(string title, string message)
-        : base(message)
+    public SpartanHttpException(string title, string message, Exception? innerException = null)
+        : base(message, innerException)
     {
         Title = title;
     }

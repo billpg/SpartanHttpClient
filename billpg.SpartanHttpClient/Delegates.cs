@@ -8,9 +8,12 @@ using System.Threading.Tasks;
 namespace billpg.SpartanHttpClient;
 
 /// <summary>
-/// Resolves a hostname to a set of candidate IP addresses. The default, configured by
-/// <see cref="SpartanRequest"/> unless overridden via WithIpLookupHandler, wraps the
-/// standard DNS resolver.
+/// Resolves a hostname to the single IP address to connect to - return one, or throw if
+/// none are usable. Where a lookup could return several candidates, weighing them (and
+/// rejecting any that shouldn't be trusted, such as private or loopback ranges) is this
+/// delegate's own job. The default, configured by <see cref="SpartanRequest"/> unless
+/// overridden via WithIpLookupHandler, wraps the standard DNS resolver and returns its
+/// first answer, with no filtering.
 /// </summary>
 public delegate Task<IPAddress> IpLookupDelegate(string host, CancellationToken cancellationToken);
 

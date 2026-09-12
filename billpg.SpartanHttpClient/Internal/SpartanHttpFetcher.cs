@@ -76,16 +76,40 @@ internal static class SpartanHttpFetcher
                 RemoteCertificateHash = certificateHash
             };
         }
-        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
+        catch (Exception ex) when (timeoutCts.IsCancellationRequested)
         {
+            /* Once our own timeout has fired, an in-flight socket/TLS operation can
+             * surface as OperationCanceledException, or - depending on platform and
+             * timing - as a raw IOException/SocketException from the abandoned
+             * connection instead. Either way, it's the timeout's fault, not a distinct
+             * transport failure worth reporting as one. */
             throw new SpartanHttpException(
                 "External URL not available.",
-                $"Timed out communicating with {request.Url} after {request.Timeout.TotalSeconds:0.#} seconds.");
+                $"Timed out communicating with {request.Url} after {request.Timeout.TotalSeconds:0.#} seconds.",
+                ex);
+        }
+        catch (Exception ex) when (ex is IOException || ex is SocketException)
+        {
+            /* Not our own timeout - a genuinely separate transport failure, such as the
+             * remote resetting the connection mid-response, or (via the default IP
+             * lookup delegate) a hostname that doesn't resolve at all. Either way, this
+             * library's whole point is that a caller only ever has to catch one
+             * exception type. */
+            throw new SpartanHttpException(
+                "External URL not available.",
+                $"Connection to {request.Url} failed: {ex.Message}",
+                ex);
         }
         finally
         {
-            networkStream?.Dispose();
-            tcpClient?.Dispose();
+            /* Disposing a stream/socket right after a cancellation just aborted a
+             * pending read can itself throw (observed as a raw IOException on some
+             * platforms) - and an exception raised while unwinding a finally block
+             * replaces whatever the catch above already threw, silently turning a
+             * clean SpartanHttpException back into a confusing transport exception.
+             * Cleanup failures here are never actionable, so they're swallowed. */
+            try { networkStream?.Dispose(); } catch { }
+            try { tcpClient?.Dispose(); } catch { }
         }
     }
 
@@ -93,7 +117,7 @@ internal static class SpartanHttpFetcher
         SpartanRequest request, CancellationToken cancellationToken)
     {
         var uri = request.Url;
-        var remoteAddress = await ResolveAcceptableAddressAsync(request, cancellationToken).ConfigureAwait(false);
+        var remoteAddress = await request.IpLookup(uri.Host, cancellationToken).ConfigureAwait(false);
 
         var tcp = new TcpClient();
         try
@@ -161,10 +185,6 @@ internal static class SpartanHttpFetcher
         }
         return (tcp, networkStream, remoteAddress, null);
     }
-
-    private static async Task<IPAddress> ResolveAcceptableAddressAsync(SpartanRequest request, CancellationToken cancellationToken)
-        => await request.IpLookup(request.Url.Host, cancellationToken).ConfigureAwait(false);
-    
 
     private static void ValidateUrlOrThrow(Uri url)
     {

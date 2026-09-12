@@ -59,6 +59,35 @@ public class SpartanHttpFetcherTests
 
         var request = RequestForPort(server.Port).WithTimeout(TimeSpan.FromMilliseconds(200));
 
+        /* Under real socket/OS conditions - especially with many loopback connections
+         * churning in parallel across the test run - the connection can occasionally be
+         * reset before the timeout itself elapses, which is a genuinely different
+         * (and correctly handled - see ConnectionResetMidResponse_IsWrappedAsSpartanHttpException)
+         * outcome than a clean cancellation. Either way this must fail fast and wrap the
+         * failure, so that's what's asserted here; the exact "Timed out" wording is
+         * covered deterministically, without any real socket involved, below. */
+        var stopwatch = Stopwatch.StartNew();
+        await Assert.ThrowsExactlyAsync<SpartanHttpException>(() => request.Run());
+        stopwatch.Stop();
+
+        Assert.IsLessThan(2000, stopwatch.ElapsedMilliseconds, "Timeout should fire close to the configured 200ms, not fall back to a much larger default.");
+    }
+
+    [TestMethod]
+    public async Task Timeout_MessageSaysTimedOut_WhenNothingElseGoesWrongFirst()
+    {
+        /* Task.Delay(TimeSpan, CancellationToken) always cancels cleanly and
+         * deterministically - unlike a real socket read, it can't race with an
+         * environmental connection reset - so this isolates the "our own timeout fired"
+         * wrapping path without depending on OS/network timing at all. */
+        var request = new SpartanRequest("https://rutabaga.invalid/")
+            .WithIpLookupHandler(async (host, ct) =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(30), ct);
+                return IPAddress.Loopback;
+            })
+            .WithTimeout(TimeSpan.FromMilliseconds(200));
+
         var stopwatch = Stopwatch.StartNew();
         var ex = await Assert.ThrowsExactlyAsync<SpartanHttpException>(() => request.Run());
         stopwatch.Stop();
@@ -73,6 +102,30 @@ public class SpartanHttpFetcherTests
         var request = new SpartanRequest("ftp://rutabaga.invalid/");
         var ex = await Assert.ThrowsExactlyAsync<SpartanHttpException>(() => request.Run());
         StringAssert.Contains(ex.Message, "ftp");
+    }
+
+    [TestMethod]
+    public async Task IpLookupFailure_IsWrappedAsSpartanHttpException()
+    {
+        /* Mirrors what the default IP lookup handler does for an unresolvable host -
+         * Dns.GetHostAddressesAsync throws SocketException, not SpartanHttpException -
+         * without depending on real, possibly-flaky DNS behavior in a unit test. */
+        var request = new SpartanRequest("https://rutabaga.invalid/")
+            .WithIpLookupHandler((host, ct) => throw new SocketException((int)SocketError.HostNotFound));
+
+        var ex = await Assert.ThrowsExactlyAsync<SpartanHttpException>(() => request.Run());
+        StringAssert.Contains(ex.Message, "rutabaga.invalid");
+        Assert.IsInstanceOfType<SocketException>(ex.InnerException);
+    }
+
+    [TestMethod]
+    public async Task ConnectionResetMidResponse_IsWrappedAsSpartanHttpException()
+    {
+        using var server = new LoopbackServer();
+        server.AcceptThenResetConnection();
+
+        var ex = await Assert.ThrowsExactlyAsync<SpartanHttpException>(() => RequestForPort(server.Port).Run());
+        StringAssert.Contains(ex.Message, "failed");
     }
 
     [TestMethod]
@@ -177,6 +230,22 @@ public class SpartanHttpFetcherTests
             listener = new TcpListener(IPAddress.Loopback, 0);
             listener.Start();
             Port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        }
+
+        /// <summary>Accepts the connection, reads the request, then aborts the socket
+        /// with LingerState(true, 0) so the OS sends an RST instead of a graceful
+        /// close - simulating a server crash or a network device resetting the
+        /// connection mid-response, rather than a clean close.</summary>
+        public void AcceptThenResetConnection()
+        {
+            _ = Task.Run(async () =>
+            {
+                using var client = await listener.AcceptTcpClientAsync();
+                using var stream = client.GetStream();
+                ReceivedRequestText = await ReadRequestAsync(stream);
+                client.LingerState = new LingerOption(true, 0);
+                client.Client.Close();
+            });
         }
 
         public void RespondWith(string rawResponse)

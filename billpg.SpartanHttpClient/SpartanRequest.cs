@@ -56,8 +56,9 @@ public sealed record SpartanRequest
     public SpartanRequest WithMaxResponseBytes(long maxBytes)
         => this with { MaxResponseBytes = maxBytes };
 
-    /// <summary>Replaces the DNS resolver used to turn the request's host into
-    /// candidate IP addresses. Defaults to the standard DNS lookup.</summary>
+    /// <summary>Replaces the resolver used to turn the request's host into the single
+    /// address to connect to. Defaults to the standard DNS resolver's first answer,
+    /// with no filtering.</summary>
     public SpartanRequest WithIpLookupHandler(IpLookupDelegate handler)
         => this with { IpLookup = handler };
 
