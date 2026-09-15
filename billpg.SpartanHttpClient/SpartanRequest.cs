@@ -21,17 +21,13 @@ namespace billpg.SpartanHttpClient;
 /// </summary>
 public sealed record SpartanRequest
 {
-    public Uri? Url { get; private init; } = null;
+    public Uri Url { get; }
     public IReadOnlyDictionary<string, string> Headers { get; private init; } = HeaderMerge.Empty;
     public TimeSpan Timeout { get; private init; } = TimeSpan.FromSeconds(10);
     public long? MaxResponseBytes { get; private init; }
     public IpLookupDelegate IpLookup { get; private init; } = DefaultIpLookup;
     public IsCertificateAcceptableDelegate IsCertificateAcceptable { get; private init; } = DefaultIsCertificateAcceptable;
     public SpartanRequestRunner Runner { get; private init; } = SpartanHttpFetcher.RunAsync;
-
-    public SpartanRequest()
-    {
-    }
 
     public SpartanRequest(Uri url)
     {
@@ -42,12 +38,6 @@ public sealed record SpartanRequest
         : this(new Uri(url))
     {
     }
-
-    public SpartanRequest WithUrl(Uri url)
-        => this with { Url = url };
-
-    public SpartanRequest WithUrl(string url)
-        => this.WithUrl(new Uri(url));
 
     /// <summary>Adds a header. Setting the same name twice combines the values with a
     /// comma, per RFC 9110 5.3, rather than replacing the earlier value.</summary>
