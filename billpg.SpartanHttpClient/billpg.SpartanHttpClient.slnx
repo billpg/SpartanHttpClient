@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="../billpg.SpartanHttpClientTests/billpg.SpartanHttpClientTests.csproj" />
+  <Project Path="billpg.SpartanHttpClient.csproj" />
+</Solution>
