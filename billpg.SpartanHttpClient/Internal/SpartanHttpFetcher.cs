@@ -23,10 +23,18 @@ internal static class SpartanHttpFetcher
 {
     internal static async Task<SpartanResponse> RunAsync(SpartanRequest request, CancellationToken callerCancellationToken)
     {
-        ValidateUrlOrThrow(request.Url);
+        /* Validate the URL supplied. */
+        if (request.Url == null)
+            throw new ArgumentNullException(nameof(request.Url), "URL must be set before running the request.");
+
+        if (request.Url.Scheme != Uri.UriSchemeHttp && request.Url.Scheme != Uri.UriSchemeHttps)
+            throw new SpartanHttpException(
+                "URL not acceptable.",
+                $"{request.Url.Scheme} URLs are not accepted - only http and https.");
 
         using var timeoutCts = new CancellationTokenSource(request.Timeout);
-        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(timeoutCts.Token, callerCancellationToken);
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
+            timeoutCts.Token, callerCancellationToken);
         var cancellationToken = linkedCts.Token;
 
         TcpClient? tcpClient = null;
@@ -184,13 +192,5 @@ internal static class SpartanHttpFetcher
             return (tcp, tls, remoteAddress, certificateHash);
         }
         return (tcp, networkStream, remoteAddress, null);
-    }
-
-    private static void ValidateUrlOrThrow(Uri url)
-    {
-        if (url.Scheme != Uri.UriSchemeHttp && url.Scheme != Uri.UriSchemeHttps)
-            throw new SpartanHttpException(
-                "URL not acceptable.",
-                $"{url.Scheme} URLs are not accepted - only http and https.");
     }
 }
